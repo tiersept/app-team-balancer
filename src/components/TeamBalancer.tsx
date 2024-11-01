@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 
 import dynamic from "next/dynamic";
+import { RoomChat } from "@/components/RoomChat";
 
 const CopyInviteLink = dynamic(
   () => import("@/components/CopyInviteLink").then((mod) => mod.CopyInviteLink),
@@ -145,8 +146,8 @@ export default function TeamBalancer() {
         </DialogContent>
       </Dialog>
 
-      <div className="discord-layout">
-        <div className="discord-header">
+      <div className="h-screen flex flex-col w-full">
+        <div className="flex items-end p-4 border-b border-border bg-card w-full">
           <Image
             src="/images/logo.webp"
             alt="Logo"
@@ -162,148 +163,153 @@ export default function TeamBalancer() {
           </h1>
         </div>
 
-        <div className="discord-content p-4 space-y-4">
-          <Card className="discord-card">
-            <CardContent className="p-4">
-              {isHost && (
-                <div className="grid w-full items-center gap-4 mb-4">
-                  <div className="flex flex-col space-y-1.5">
-                    <Label
-                      htmlFor="numTeams"
-                      className="text-sm text-muted-foreground"
-                    >
-                      Number of Teams
-                    </Label>
-                    <Input
-                      id="numTeams"
-                      type="number"
-                      value={numTeams}
-                      onChange={(e) =>
-                        setNumTeams(Math.max(2, parseInt(e.target.value)))
-                      }
-                      className="bg-secondary border-none focus:ring-1 focus:ring-primary"
-                    />
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <Card className="discord-card">
+              <CardContent className="p-4">
+                {isHost && (
+                  <div className="grid w-full items-center gap-4 mb-4">
+                    <div className="flex flex-col space-y-1.5">
+                      <Label
+                        htmlFor="numTeams"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Number of Teams
+                      </Label>
+                      <Input
+                        id="numTeams"
+                        type="number"
+                        value={numTeams}
+                        onChange={(e) =>
+                          setNumTeams(Math.max(2, parseInt(e.target.value)))
+                        }
+                        className="bg-secondary border-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
                   </div>
+                )}
+
+                <div className="flex items-center space-x-2 text-sm">
+                  <span className="text-muted-foreground">Copy room link:</span>
+                  {/* <span className="font-mono">{roomCode}</span> */}
+                  <CopyInviteLink />
                 </div>
-              )}
 
-              <div className="flex items-center space-x-2 text-sm">
-                <span className="text-muted-foreground">Copy room link:</span>
-                {/* <span className="font-mono">{roomCode}</span> */}
-                <CopyInviteLink />
-              </div>
+                <div className="mt-4 text-sm">
+                  <span className="text-muted-foreground">
+                    Connected Players:
+                  </span>
+                  <span className="ml-2">{connectedPlayers.length}</span>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="mt-4 text-sm">
-                <span className="text-muted-foreground">
-                  Connected Players:
-                </span>
-                <span className="ml-2">{connectedPlayers.length}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {connectedPlayers.length > 0 && (
-            <Card className="discord-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">Players</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {connectedPlayers.map((player) => (
-                    <div
-                      key={player.id}
-                      className="flex items-center space-x-2 py-2 px-2 hover:bg-secondary rounded-md"
+            {connectedPlayers.length > 0 && (
+              <Card className="discord-card">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-semibold">
+                    Players
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {connectedPlayers.map((player) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center space-x-2 py-2 px-2 hover:bg-secondary rounded-md"
+                      >
+                        <span className="w-1/3">
+                          {player.getState("name") || `Unknown player`}
+                        </span>
+                        {isHost ? (
+                          <>
+                            <Input
+                              type="number"
+                              value={playerSkills[player.id] || 1}
+                              onChange={(e) => {
+                                const value =
+                                  e.target.value === ""
+                                    ? 1
+                                    : parseInt(e.target.value);
+                                updatePlayerSkill(player.id, value);
+                              }}
+                              onBlur={(e) => {
+                                const value = Math.max(
+                                  1,
+                                  Math.min(5, parseInt(e.target.value) || 1)
+                                );
+                                updatePlayerSkill(player.id, value);
+                              }}
+                              min="1"
+                              max="5"
+                              className="w-20"
+                            />
+                            <span className="text-sm text-muted-foreground">
+                              Skill Level (1-5)
+                            </span>
+                            {player.id !== myPlayer()?.id && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="ml-2 text-red-500 hover:text-red-700"
+                                onClick={() => kickPlayer(player.id)}
+                                title="Kick Player"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          playerSkills[player.id] && (
+                            <span className="text-sm text-muted-foreground">
+                              ⭐ Rated by host
+                            </span>
+                          )
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {isHost && (
+                    <Button
+                      onClick={balanceTeams}
+                      className="mt-4 bg-primary hover:bg-primary/90"
+                      disabled={connectedPlayers.length < numTeams}
                     >
-                      <span className="w-1/3">
-                        {player.getState("name") || `Unknown player`}
-                      </span>
-                      {isHost ? (
-                        <>
-                          <Input
-                            type="number"
-                            value={playerSkills[player.id] || 1}
-                            onChange={(e) => {
-                              const value =
-                                e.target.value === ""
-                                  ? 1
-                                  : parseInt(e.target.value);
-                              updatePlayerSkill(player.id, value);
-                            }}
-                            onBlur={(e) => {
-                              const value = Math.max(
-                                1,
-                                Math.min(5, parseInt(e.target.value) || 1)
-                              );
-                              updatePlayerSkill(player.id, value);
-                            }}
-                            min="1"
-                            max="5"
-                            className="w-20"
-                          />
-                          <span className="text-sm text-muted-foreground">
-                            Skill Level (1-5)
-                          </span>
-                          {player.id !== myPlayer()?.id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="ml-2 text-red-500 hover:text-red-700"
-                              onClick={() => kickPlayer(player.id)}
-                              title="Kick Player"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        playerSkills[player.id] && (
-                          <span className="text-sm text-muted-foreground">
-                            ⭐ Rated by host
-                          </span>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                      Balance Teams
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-          {isHost && (
-            <Button
-              onClick={balanceTeams}
-              className="w-full bg-primary hover:bg-primary/90"
-              disabled={connectedPlayers.length < numTeams}
-            >
-              Balance Teams
-            </Button>
-          )}
-
-          {teams.length > 0 && (
-            <Card className="discord-card">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">
-                  Balanced Teams
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {teams.map((team, index) => (
-                    <div key={index} className="border rounded p-2">
-                      <h3 className="font-bold mb-2">Team {index + 1}</h3>
-                      <ul>
-                        {team.map((player) => (
-                          <li key={player.id}>
-                            {player.name} {isHost && `(Skill: ${player.skill})`}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+            {teams.length > 0 && (
+              <Card className="discord-card grow">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg font-semibold">
+                    Balanced Teams
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {teams.map((team, index) => (
+                      <div key={index} className="border rounded p-2">
+                        <h3 className="font-bold mb-2">Team {index + 1}</h3>
+                        <ul>
+                          {team.map((player) => (
+                            <li key={player.id}>
+                              {player.name}{" "}
+                              {isHost && `(Skill: ${player.skill})`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          <RoomChat />
         </div>
       </div>
     </>
