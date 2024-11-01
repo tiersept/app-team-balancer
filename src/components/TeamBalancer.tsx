@@ -105,6 +105,7 @@ export default function TeamBalancer() {
   const roomCode = getRoomCode() || "...";
 
   const copyInviteLink = () => {
+    if (typeof window === 'undefined') return;
     const url = `${window.location.origin}?r=${roomCode}`;
     navigator.clipboard.writeText(url);
   };
