@@ -11,10 +11,8 @@ import {
   useIsHost,
   myPlayer,
   usePlayersList,
-  getRoomCode,
-  usePlayersState,
 } from "playroomkit";
-import { X, Copy } from "lucide-react";
+import { X } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -22,6 +20,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
+import dynamic from "next/dynamic";
+
+const CopyInviteLink = dynamic(
+  () => import("@/components/CopyInviteLink").then((mod) => mod.CopyInviteLink),
+  {
+    ssr: false,
+  }
+);
 
 type Player = {
   id: string;
@@ -36,12 +43,16 @@ export default function TeamBalancer() {
   const [playerName, setPlayerName] = useState("");
 
   const isHost = useIsHost();
-  const connectedPlayers = usePlayersList();
-  const playersNames = usePlayersState("name");
-  console.log({ playersNames });
+  const connectedPlayers = usePlayersList(true);
+  // const playersNames = usePlayersState("name");
+  // console.log({ playersNames });
+
   const [playerSkills, setPlayerSkills] = useMultiplayerState<
     Record<string, number>
   >("playerSkills", {});
+
+  // const players = usePlayersState('name');
+
   const [teams, setTeams] = useMultiplayerState<Player[][]>("teams", []);
 
   useEffect(() => {
@@ -61,7 +72,6 @@ export default function TeamBalancer() {
     const player = myPlayer();
     if (player) {
       player.setState("name", playerName.trim());
-      // setName(playerName.trim());
     }
     setShowNameDialog(false);
   };
@@ -100,14 +110,6 @@ export default function TeamBalancer() {
     });
 
     setTeams(balancedTeams);
-  };
-
-  const roomCode = getRoomCode() || "...";
-
-  const copyInviteLink = () => {
-    if (typeof window === 'undefined') return;
-    const url = `${window.location.origin}?r=${roomCode}`;
-    navigator.clipboard.writeText(url);
   };
 
   const kickPlayer = (playerId: string) => {
@@ -186,16 +188,9 @@ export default function TeamBalancer() {
               )}
 
               <div className="flex items-center space-x-2 text-sm">
-                <span className="text-muted-foreground">Room Code:</span>
-                <span className="font-mono">{roomCode}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={copyInviteLink}
-                  className="hover:bg-secondary"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+                <span className="text-muted-foreground">Copy room link:</span>
+                {/* <span className="font-mono">{roomCode}</span> */}
+                <CopyInviteLink />
               </div>
 
               <div className="mt-4 text-sm">
@@ -220,19 +215,27 @@ export default function TeamBalancer() {
                       className="flex items-center space-x-2 py-2 px-2 hover:bg-secondary rounded-md"
                     >
                       <span className="w-1/3">
-                        {player.getState("name") || `Player ${player?.id}`}
+                        {player.getState("name") || `Unknown player`}
                       </span>
                       {isHost ? (
                         <>
                           <Input
                             type="number"
                             value={playerSkills[player.id] || 1}
-                            onChange={(e) =>
-                              updatePlayerSkill(
-                                player.id,
-                                parseInt(e.target.value)
-                              )
-                            }
+                            onChange={(e) => {
+                              const value =
+                                e.target.value === ""
+                                  ? 1
+                                  : parseInt(e.target.value);
+                              updatePlayerSkill(player.id, value);
+                            }}
+                            onBlur={(e) => {
+                              const value = Math.max(
+                                1,
+                                Math.min(5, parseInt(e.target.value) || 1)
+                              );
+                              updatePlayerSkill(player.id, value);
+                            }}
                             min="1"
                             max="5"
                             className="w-20"
