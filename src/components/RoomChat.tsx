@@ -1,88 +1,122 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useMultiplayerState, myPlayer } from "playroomkit";
+"use client";
 
-type ChatMessage = {
-  playerId: string;
-  playerName: string;
-  message: string;
-  timestamp: number;
+import { useState, useEffect, useRef } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/utils/supabase/client";
+import { useSearchParams } from "next/navigation";
+
+type Message = {
+  id: string;
+  content: string;
+  player_name: string;
+  created_at: string;
+  room_id: string;
 };
 
 export function RoomChat() {
-  const [messages, setMessages] = useMultiplayerState<ChatMessage[]>(
-    "messages",
-    []
-  );
-  const [chatMessage, setChatMessage] = useState("");
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const supabase = createClient();
+  const searchParams = useSearchParams();
+  const roomId = searchParams.get("room");
 
-  const sendMessage = () => {
-    if (!chatMessage.trim()) return;
+  const fetchMessages = async () => {
+    if (!roomId) return;
 
-    const player = myPlayer();
-    if (!player) return;
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true });
 
-    setMessages([
-      ...messages,
+    if (error) {
+      console.error("Error fetching messages:", error);
+      return;
+    }
+
+    setMessages(data || []);
+    scrollToBottom();
+  };
+
+  useEffect(() => {
+    // Initial fetch
+    fetchMessages();
+
+    // Setup realtime subscription
+    const channel = supabase
+      .channel(`room_${roomId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload) => {
+          console.log("Received realtime message:", payload);
+          setMessages((current) => [...current, payload.new as Message]);
+          scrollToBottom();
+        }
+      )
+      .subscribe((status) => {
+        console.log("Subscription status:", status);
+      });
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [roomId]);
+
+  const sendMessage = async () => {
+    if (!message.trim() || !roomId) return;
+
+    const { error } = await supabase.from("messages").insert([
       {
-        playerId: player.id,
-        playerName: player.getState("name") || "Unknown player",
-        message: chatMessage.trim(),
-        timestamp: Date.now(),
+        content: message.trim(),
+        room_id: roomId,
+        player_name: "Anonymous",
       },
     ]);
-    setChatMessage("");
+
+    if (error) {
+      console.error("Error sending message:", error);
+      return;
+    }
+
+    setMessage("");
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <div className="w-80 min-w-[640px] bg-secondary/50 border-l border-border flex flex-col">
+    <div className="w-80 border-l border-border bg-card flex flex-col h-full">
       <div className="p-4 border-b border-border">
         <h2 className="font-semibold">Room Chat</h2>
       </div>
-
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto min-h-0">
-        {messages.map((msg, i) => (
-          <div
-            key={msg.timestamp + i}
-            className={`flex flex-col ${
-              msg.playerId === myPlayer()?.id ? "items-end" : "items-start"
-            }`}
-          >
-            <span className="text-xs text-muted-foreground">
-              {msg.playerName}
-            </span>
-            <div
-              className={`rounded-lg px-3 py-2 max-w-[80%] ${
-                msg.playerId === myPlayer()?.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              }`}
-            >
-              {msg.message}
-            </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className="space-y-1">
+            <div className="text-sm font-medium">{msg.player_name}</div>
+            <div className="bg-secondary p-2 rounded-md">{msg.content}</div>
           </div>
         ))}
+        <div ref={messagesEndRef} />
       </div>
-
       <div className="p-4 border-t border-border">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            sendMessage();
-          }}
-          className="flex gap-2"
-        >
+        <div className="flex space-x-2">
           <Input
-            value={chatMessage}
-            onChange={(e) => setChatMessage(e.target.value)}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
             placeholder="Type a message..."
-            className="flex-1"
           />
-          <Button type="submit" size="sm">
-            Send
-          </Button>
-        </form>
+          <Button onClick={sendMessage}>Send</Button>
+        </div>
       </div>
     </div>
   );

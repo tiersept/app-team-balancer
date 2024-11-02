@@ -1,11 +1,11 @@
-import TeamBalancer from "@/components/TeamBalancer";
+import TeamBalancerSupa from "@/components/TeamBalancerSupa";
 
-export const dynamic = 'force-dynamic'
+// export const dynamic = 'force-dynamic'
 
 export default function Home() {
   return (
     <div className="flex items-center justify-center font-[family-name:var(--font-geist-sans)]">
-      <TeamBalancer />
+      <TeamBalancerSupa />
     </div>
   );
 }

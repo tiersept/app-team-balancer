@@ -123,7 +123,7 @@ export default function TeamBalancer() {
 
   return (
     <>
-      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+      <Dialog open={showNameDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Enter Your Name</DialogTitle>
